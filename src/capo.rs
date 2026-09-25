@@ -1,5 +1,5 @@
-use std::cmp::Ordering;
 use regex::Regex;
+use std::cmp::Ordering;
 
 /// Capo priority weights (lower number = higher priority).
 /// Based on Rick Viscomi's Capo.js: https://github.com/rviscomi/capo.js
@@ -56,11 +56,18 @@ pub fn classify_element(raw: &str, index: usize) -> HeadElement {
     let trimmed = lower.trim();
 
     let priority = if trimmed.starts_with("<meta") {
-        if trimmed.contains("http-equiv=\"origin-trial\"") || trimmed.contains("http-equiv='origin-trial'") {
+        if trimmed.contains("http-equiv=\"origin-trial\"")
+            || trimmed.contains("http-equiv='origin-trial'")
+        {
             CapoPriority::OriginTrials
-        } else if trimmed.contains("charset=") || trimmed.contains("http-equiv=\"content-type\"") || trimmed.contains("http-equiv='content-type'") {
+        } else if trimmed.contains("charset=")
+            || trimmed.contains("http-equiv=\"content-type\"")
+            || trimmed.contains("http-equiv='content-type'")
+        {
             CapoPriority::MetaCharset
-        } else if trimmed.contains("http-equiv=\"content-security-policy\"") || trimmed.contains("http-equiv='content-security-policy'") {
+        } else if trimmed.contains("http-equiv=\"content-security-policy\"")
+            || trimmed.contains("http-equiv='content-security-policy'")
+        {
             CapoPriority::MetaCsp
         } else if trimmed.contains("name=\"viewport\"") || trimmed.contains("name='viewport'") {
             CapoPriority::MetaViewport
@@ -93,7 +100,10 @@ pub fn classify_element(raw: &str, index: usize) -> HeadElement {
     } else if trimmed.starts_with("<script") {
         if trimmed.contains("async") {
             CapoPriority::AsyncScript
-        } else if trimmed.contains("defer") || trimmed.contains("type=\"module\"") || trimmed.contains("type='module'") {
+        } else if trimmed.contains("defer")
+            || trimmed.contains("type=\"module\"")
+            || trimmed.contains("type='module'")
+        {
             CapoPriority::DeferScript
         } else {
             CapoPriority::SyncScript
@@ -162,11 +172,9 @@ pub fn calculate_capo_score(elements: &[HeadElement]) -> f64 {
 
 /// Reorder elements stably according to Capo priorities.
 pub fn reorder_head_elements(mut elements: Vec<HeadElement>) -> Vec<HeadElement> {
-    elements.sort_by(|a, b| {
-        match a.priority.cmp(&b.priority) {
-            Ordering::Equal => a.original_index.cmp(&b.original_index),
-            other => other,
-        }
+    elements.sort_by(|a, b| match a.priority.cmp(&b.priority) {
+        Ordering::Equal => a.original_index.cmp(&b.original_index),
+        other => other,
     });
     elements
 }
@@ -180,13 +188,17 @@ mod tests {
         let el_charset = classify_element("<meta charset=\"utf-8\">", 0);
         assert_eq!(el_charset.priority, CapoPriority::MetaCharset);
 
-        let el_viewport = classify_element("<meta name=\"viewport\" content=\"width=device-width\">", 1);
+        let el_viewport =
+            classify_element("<meta name=\"viewport\" content=\"width=device-width\">", 1);
         assert_eq!(el_viewport.priority, CapoPriority::MetaViewport);
 
         let el_title = classify_element("<title>My Page</title>", 2);
         assert_eq!(el_title.priority, CapoPriority::Title);
 
-        let el_preconnect = classify_element("<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\">", 3);
+        let el_preconnect = classify_element(
+            "<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\">",
+            3,
+        );
         assert_eq!(el_preconnect.priority, CapoPriority::Preconnect);
 
         let el_defer = classify_element("<script defer src=\"/app.js\"></script>", 4);

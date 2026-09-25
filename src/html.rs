@@ -1,9 +1,9 @@
-use std::path::Path;
-use std::fs;
-use anyhow::Result;
-use regex::Regex;
 use crate::capo::{calculate_capo_score, parse_head_elements, reorder_head_elements};
 use crate::css::minify_css;
+use anyhow::Result;
+use regex::Regex;
+use std::fs;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct ProcessOptions {
@@ -36,7 +36,11 @@ pub struct HtmlAuditResult {
 }
 
 /// Process a single HTML string with the given options and base root directory (for resolving assets).
-pub fn process_html(html: &str, base_dir: Option<&Path>, options: &ProcessOptions) -> Result<(String, HtmlAuditResult)> {
+pub fn process_html(
+    html: &str,
+    base_dir: Option<&Path>,
+    options: &ProcessOptions,
+) -> Result<(String, HtmlAuditResult)> {
     let mut out = html.to_string();
     let mut inlined_css_count = 0;
     let mut inlined_css_bytes = 0;
@@ -44,51 +48,59 @@ pub fn process_html(html: &str, base_dir: Option<&Path>, options: &ProcessOption
     // 1. Inline local stylesheets if requested and base_dir is available
     if options.inline_css {
         if let Some(root) = base_dir {
-            let link_re = Regex::new(r#"(?i)<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*>"#).unwrap();
+            let link_re =
+                Regex::new(r#"(?i)<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*>"#).unwrap();
             let href_re = Regex::new(r#"(?i)href\s*=\s*["']([^"']+)["']"#).unwrap();
 
-            out = link_re.replace_all(&out, |caps: &regex::Captures| {
-                let tag = &caps[0];
-                if let Some(href_cap) = href_re.captures(tag) {
-                    let href = &href_cap[1];
-                    // Only inline local relative or root-relative paths, not http(s) or cdn
-                    if !href.starts_with("http://") && !href.starts_with("https://") && !href.starts_with("//") {
-                        let clean_href = href.split('?').next().unwrap_or(href);
-                        let rel_path = clean_href.trim_start_matches('/');
-                        let file_path = root.join(rel_path);
+            out = link_re
+                .replace_all(&out, |caps: &regex::Captures| {
+                    let tag = &caps[0];
+                    if let Some(href_cap) = href_re.captures(tag) {
+                        let href = &href_cap[1];
+                        // Only inline local relative or root-relative paths, not http(s) or cdn
+                        if !href.starts_with("http://")
+                            && !href.starts_with("https://")
+                            && !href.starts_with("//")
+                        {
+                            let clean_href = href.split('?').next().unwrap_or(href);
+                            let rel_path = clean_href.trim_start_matches('/');
+                            let file_path = root.join(rel_path);
 
-                        if file_path.is_file() {
-                            if let Ok(metadata) = fs::metadata(&file_path) {
-                                if metadata.len() as usize <= options.max_inline_css_bytes {
-                                    if let Ok(content) = fs::read_to_string(&file_path) {
-                                        let minified = if options.minify_inline_css {
-                                            minify_css(&content).unwrap_or(content)
-                                        } else {
-                                            content
-                                        };
-                                        inlined_css_count += 1;
-                                        inlined_css_bytes += minified.len();
-                                        return format!("<style>{}</style>", minified);
+                            if file_path.is_file() {
+                                if let Ok(metadata) = fs::metadata(&file_path) {
+                                    if metadata.len() as usize <= options.max_inline_css_bytes {
+                                        if let Ok(content) = fs::read_to_string(&file_path) {
+                                            let minified = if options.minify_inline_css {
+                                                minify_css(&content).unwrap_or(content)
+                                            } else {
+                                                content
+                                            };
+                                            inlined_css_count += 1;
+                                            inlined_css_bytes += minified.len();
+                                            return format!("<style>{}</style>", minified);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                tag.to_string()
-            }).to_string();
+                    tag.to_string()
+                })
+                .to_string();
         }
     }
 
     // 2. Minify existing <style> tags
     if options.minify_inline_css {
         let style_re = Regex::new(r"(?is)<style\b([^>]*)>(.*?)</style>").unwrap();
-        out = style_re.replace_all(&out, |caps: &regex::Captures| {
-            let attrs = &caps[1];
-            let css_body = &caps[2];
-            let minified = minify_css(css_body).unwrap_or_else(|_| css_body.to_string());
-            format!("<style{}>{}</style>", attrs, minified)
-        }).to_string();
+        out = style_re
+            .replace_all(&out, |caps: &regex::Captures| {
+                let attrs = &caps[1];
+                let css_body = &caps[2];
+                let minified = minify_css(css_body).unwrap_or_else(|_| css_body.to_string());
+                format!("<style{}>{}</style>", attrs, minified)
+            })
+            .to_string();
     }
 
     // 3. Capo Head Audit & Reordering

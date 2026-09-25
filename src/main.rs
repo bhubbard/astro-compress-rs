@@ -3,21 +3,25 @@ mod css;
 mod html;
 mod svg;
 
+use anyhow::Result;
+use clap::Parser;
+use rayon::prelude::*;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
-use anyhow::Result;
-use clap::Parser;
-use rayon::prelude::*;
 use walkdir::WalkDir;
 
-use html::{process_html, ProcessOptions};
 use css::minify_css;
+use html::{ProcessOptions, process_html};
 use svg::minify_svg;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "High-performance Rust post-build compressor, CSS inliner, and Capo head reorderer for Astro sites")]
+#[command(
+    author,
+    version,
+    about = "High-performance Rust post-build compressor, CSS inliner, and Capo head reorderer for Astro sites"
+)]
 struct Args {
     /// Directory containing built static site (e.g. dist/)
     #[arg(default_value = "dist")]
@@ -65,13 +69,22 @@ fn main() -> Result<()> {
     let start_time = Instant::now();
 
     if !args.dir.is_dir() {
-        anyhow::bail!("Directory '{}' does not exist or is not a directory", args.dir.display());
+        anyhow::bail!(
+            "Directory '{}' does not exist or is not a directory",
+            args.dir.display()
+        );
     }
 
     println!("🚀 astro-compress-rs v{}", env!("CARGO_PKG_VERSION"));
     println!("📂 Target directory: {}", args.dir.display());
-    println!("⚙️  Config: Capo Head Reorder={}, Inline CSS={} (max {} B), Minify CSS={}, Minify SVG={}, Minify HTML={}",
-        args.reorder_head, args.inline_css, args.max_inline_css, args.minify_css, args.minify_svg, args.minify_html
+    println!(
+        "⚙️  Config: Capo Head Reorder={}, Inline CSS={} (max {} B), Minify CSS={}, Minify SVG={}, Minify HTML={}",
+        args.reorder_head,
+        args.inline_css,
+        args.max_inline_css,
+        args.minify_css,
+        args.minify_svg,
+        args.minify_html
     );
 
     // Collect all files to process
@@ -93,7 +106,12 @@ fn main() -> Result<()> {
         }
     }
 
-    println!("Found {} HTML files, {} CSS files, {} SVG files", html_files.len(), css_files.len(), svg_files.len());
+    println!(
+        "Found {} HTML files, {} CSS files, {} SVG files",
+        html_files.len(),
+        css_files.len(),
+        svg_files.len()
+    );
 
     let total_html_bytes_before = AtomicUsize::new(0);
     let total_html_bytes_after = AtomicUsize::new(0);
@@ -125,8 +143,10 @@ fn main() -> Result<()> {
                 total_css_inlined_count.fetch_add(audit.inlined_css_count, Ordering::Relaxed);
                 total_css_inlined_bytes.fetch_add(audit.inlined_css_bytes, Ordering::Relaxed);
 
-                sum_initial_capo_score.fetch_add((audit.initial_capo_score * 100.0) as u64, Ordering::Relaxed);
-                sum_final_capo_score.fetch_add((audit.final_capo_score * 100.0) as u64, Ordering::Relaxed);
+                sum_initial_capo_score
+                    .fetch_add((audit.initial_capo_score * 100.0) as u64, Ordering::Relaxed);
+                sum_final_capo_score
+                    .fetch_add((audit.final_capo_score * 100.0) as u64, Ordering::Relaxed);
 
                 if !args.audit_only && !args.dry_run {
                     let _ = fs::write(path, processed);
@@ -172,7 +192,8 @@ fn main() -> Result<()> {
 
     let elapsed = start_time.elapsed();
     let count_html = html_files.len().max(1) as f64;
-    let avg_initial_capo = (sum_initial_capo_score.load(Ordering::Relaxed) as f64 / 100.0) / count_html;
+    let avg_initial_capo =
+        (sum_initial_capo_score.load(Ordering::Relaxed) as f64 / 100.0) / count_html;
     let avg_final_capo = (sum_final_capo_score.load(Ordering::Relaxed) as f64 / 100.0) / count_html;
 
     println!("\n✨ Compression & Audit Complete in {:.2?}", elapsed);
@@ -180,23 +201,39 @@ fn main() -> Result<()> {
     println!("📊 Capo.js Head Efficiency:");
     println!("   Initial Average Score: {:.1}%", avg_initial_capo);
     if !args.audit_only && args.reorder_head {
-        println!("   Optimized Average Score: {:.1}% (improved by +{:.1}%)", avg_final_capo, avg_final_capo - avg_initial_capo);
+        println!(
+            "   Optimized Average Score: {:.1}% (improved by +{:.1}%)",
+            avg_final_capo,
+            avg_final_capo - avg_initial_capo
+        );
     }
     println!("📦 Critical CSS Inlining:");
-    println!("   Inlined stylesheets: {} instances ({} bytes total)",
+    println!(
+        "   Inlined stylesheets: {} instances ({} bytes total)",
         total_css_inlined_count.load(Ordering::Relaxed),
         total_css_inlined_bytes.load(Ordering::Relaxed)
     );
     println!("💾 Size Savings:");
     let html_before = total_html_bytes_before.load(Ordering::Relaxed);
     let html_after = total_html_bytes_after.load(Ordering::Relaxed);
-    println!("   HTML Size: {} KB → {} KB ({:+.1}%)",
+    println!(
+        "   HTML Size: {} KB → {} KB ({:+.1}%)",
         html_before / 1024,
         html_after / 1024,
-        if html_before > 0 { ((html_after as f64 - html_before as f64) / html_before as f64) * 100.0 } else { 0.0 }
+        if html_before > 0 {
+            ((html_after as f64 - html_before as f64) / html_before as f64) * 100.0
+        } else {
+            0.0
+        }
     );
-    println!("   Standalone CSS saved: {} KB", total_css_bytes_saved.load(Ordering::Relaxed) / 1024);
-    println!("   Standalone SVG saved: {} KB", total_svg_bytes_saved.load(Ordering::Relaxed) / 1024);
+    println!(
+        "   Standalone CSS saved: {} KB",
+        total_css_bytes_saved.load(Ordering::Relaxed) / 1024
+    );
+    println!(
+        "   Standalone SVG saved: {} KB",
+        total_svg_bytes_saved.load(Ordering::Relaxed) / 1024
+    );
     println!("──────────────────────────────────────────────────");
 
     Ok(())

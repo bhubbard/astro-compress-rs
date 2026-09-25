@@ -1,5 +1,5 @@
-use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
 use anyhow::Result;
+use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
 
 /// Minify a raw CSS string using lightningcss.
 pub fn minify_css(css: &str) -> Result<String> {
