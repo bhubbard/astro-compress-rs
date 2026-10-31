@@ -167,7 +167,7 @@ pub fn calculate_capo_score(elements: &[HeadElement]) -> f64 {
     }
 
     let ratio = 1.0 - (inversions as f64 / total_pairs as f64);
-    (ratio * 100.0).max(0.0).min(100.0)
+    (ratio * 100.0).clamp(0.0, 100.0)
 }
 
 /// Reorder elements stably according to Capo priorities.
